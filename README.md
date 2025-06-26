@@ -21,7 +21,7 @@ The project has been tested on CUDA 12.4, pytorch 2.4.1, torchvision 0.19.1,  py
 ### 2.1 Instructions
 
 - The code for training and testing can be downloaded at public repository ：https://github.com/bianlab/MOCI
-- The mask, testing measurements and pre-trained weights can be downloaded from the Google Drive link: https://drive.google.com/drive/folders/1x6nZpcTP9RIsENJL566pV9v83e1e4gpn?usp=sharing
+- The mask, testing measurements and pre-trained weights can be downloaded from the Google Drive link:https://drive.google.com/drive/folders/1zO8D3iA7adLsSVAfkJf1EhHM2qwzY6TB?usp=drive_link
 - Due to the massive amount of training dataset, we have packaged it into multiple repositories for storage: https://github.com/bianlab/Hyperspectral-imaging-dataset
 
 
@@ -32,11 +32,11 @@ The project has been tested on CUDA 12.4, pytorch 2.4.1, torchvision 0.19.1,  py
 
 - The model of hyperspectral images reconstruction:  `./architecture/PSRNet.py` 
 
-- Pre-trained weights of PSRNet for PHI sensor:   `./model_zoo/PSRNet.pth` 
+- Pre-trained weights of PSRNet for PHI sensor:   `./model_zoo/PSRNet_MOCI.pth` 
 
 - Calibrated sensing matrix of PHI snesor:   `./MASK/mask.mat` 
 
-- Measurements collected by our single-shot PHI senor:   `./Measurements_Test/HyperspecI_V1/` 
+- Measurements collected by our single-shot PHI senor:   `./Measurements/` 
 
 - The test and training program :    `train.py` , `test.py` 
 
@@ -68,7 +68,7 @@ When the images were collected using our PHI sensors,  the polarization and hype
 python test.py
 ```
 
-The measurements collected using PHI sensor from the folder  `'./Measurements/PHI/' `  . And output reconstructed multi-dimensional images  will be saved in  `'./Measurements/Output_PHI/' `  .
+The measurements collected using PHI sensor from the folder  `'./Measurements/' `  . And output reconstructed multi-dimensional images  will be saved in  `'./Measurements/Output_PHI/' `  .
 
 
 

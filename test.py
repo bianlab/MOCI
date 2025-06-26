@@ -25,15 +25,11 @@ parser.add_argument("--start_dir", type=int, default=(0, 0), help="size of test 
 parser.add_argument("--image_size", type=int, default=(1024, 1224), help="size of test image")
 
 
-parser.add_argument("--pretrained_model_path", type=str, default='/ssd/wzh/home_ssd/1_SpecPol/1_SpecPolCode_Submit/exp/Polarization_Spec_PSRNet_Fusion_MASK/mask_0108_pols_all_pols_0421_train256_alternate_freq2/net_192epoch.pth', help='path log files')
+parser.add_argument("--pretrained_model_path", type=str, default='./Model_zoo/psrnet_MOCI.pth', help='path log files')
 
 
-# parser.add_argument("--image_folder", type=str, default= '/ssd/wzh/home_ssd/1_SpecPol/1_SpecPolCode/Test/Birefringence/select_MOS_0416/image/', help='path log files')
-# parser.add_argument("--save_folder", type=str, default= '/ssd/wzh/home_ssd/1_SpecPol/1_SpecPolCode/Test/Birefringence/select_MOS_0416/Out_image_0428_all/', help='path log files')
-
-
-parser.add_argument("--image_folder", type=str, default= '/ssd/wzh/home_ssd/1_SpecPol/1_SpecPolCode_Submit/Test/Measurement/test_1/', help='path log files')
-parser.add_argument("--save_folder", type=str, default= '/ssd/wzh/home_ssd/1_SpecPol/1_SpecPolCode_Submit/Test/Measurement/test_1_HSIPOLS_0531/', help='path log files')
+parser.add_argument("--image_folder", type=str, default= './Test/Measurement/test_1/', help='path log files')
+parser.add_argument("--save_folder", type=str, default= './Test/Measurement/test_1_HSIPOLS_0531/', help='path log files')
 
 
 opt = parser.parse_args()
@@ -143,9 +139,7 @@ def white_balance_loops(rgb_R):
     rgb_R = (rgb_R * scaling_factors).clip(0, 255).astype(np.uint8)
     return rgb_R
 
-#通过重建的光谱-偏振数据展示AOP和DOP
 def Get_AOP_DOP(pols):
-    # pols = np.minimum(pols + 0.01, 1.0)
     pols = pols / pols.max()
     pol_0 = pols[0, :, :]
     pol_45 = pols[1, :, :]
@@ -176,7 +170,6 @@ def main():
     mask = np.maximum(mask, 0)
     mask = mask / mask.max()
     mask = torch.from_numpy(mask)
-    # mask = mask.permute(3, 0, 1, 2)
     mask = mask.cuda()
     print('mask:', mask.dtype, mask.shape, mask.max(), mask.mean(), mask.min())
 
@@ -218,13 +211,8 @@ def main():
 
         mos_name = test_list[i]
 
-
         bmp = cv2.imread(opt.image_folder + mos_name)[:, :, 0]
   
-        # bmp = np.load(opt.image_folder + test_list[i])
-
-
-
         bmp = np.expand_dims(bmp, 0)
         bmp = bmp / bmp.max()
         bmp = bmp.astype(np.float32)
@@ -238,313 +226,34 @@ def main():
         MOS = MOS.unsqueeze(1)
         MOS = MOS[:, :, opt.start_dir[0]:opt.start_dir[0]+opt.image_size[0], opt.start_dir[1]:opt.start_dir[1] + opt.image_size[1]]
         MOS = MOS / MOS.max()
-        print('MOS>>>>>>>>>>', mos_name, MOS.dtype, MOS.shape, MOS.max(), MOS.mean(), MOS.min())
         MOS = MOS.unsqueeze(0)
 
-
-        print('MOS>>>>>>>>>>', mos_name, MOS.shape, MOS.max(), MOS.mean(), MOS.min())
-
-
-
- 
         MOS_spec = MOS
         MOS_spec = MOS_spec.cuda()
 
-        
-
-        print('MOS_spec>>>>>>>>>>', mos_name, MOS_spec.shape, MOS_spec.max(), MOS_spec.mean(), MOS_spec.min())
-
         mask_patch = mask
         mask_patch = mask_patch / mask_patch.max()
-        print('mask_patch>>>>>>>>>>', mask_patch.shape, mask_patch.max(), mask_patch.mean(), mask_patch.min())
         mask_patch = mask_patch.unsqueeze(0)
-
-        
-
-        # p, c, h, w = mask_patch.shape
-        # mask_patch_pols = mask_patch.unsqueeze(0)
-        # mask_patch_pols = mask_patch_pols.repeat(opt.batch_size, 1, 1, 1, 1)
-        # mask_patch_pols = mask_patch_pols.view(opt.batch_size, p * c, h, w)
-        # print('mask_patch_pols>>>>>>>>>>', mask_patch_pols.shape, mask_patch_pols.max(), mask_patch_pols.mean(), mask_patch_pols.min())
 
         with torch.no_grad():
 
-            print('mask_patch>>>>>>>>>>', mask_patch.shape, mask_patch.max(), mask_patch.mean(), mask_patch.min())
-
-
             outputs_spec = model(MOS_spec, mask_patch, 'pols')
-
-            print('outputs_spec>>>>>>>>>>', outputs_spec.shape, outputs_spec.max(), outputs_spec.mean(), outputs_spec.min())
 
             outputs_spec = outputs_spec / outputs_spec.max()
 
-
-            print('outputs_spec', outputs_spec.shape, outputs_spec.max(), outputs_spec.mean(), outputs_spec.min())
-
             output_hsi = torch.maximum(outputs_spec, torch.tensor(0))
             output_hsi = output_hsi.squeeze()
-            # output_hsi = output_hsi / output_hsi.max()
             output_hsi = output_hsi.cpu().numpy()
-
-            # exit()
-
-
             
             MOS = MOS.squeeze()
             input_mos = MOS.cpu().numpy()
 
-
-
-        print('input_mos>>>>>>>>>>', input_mos.dtype, input_mos.shape, input_mos.max(), input_mos.mean(), input_mos.min())
-        print('output_hsi>>>>>>>>>>', output_hsi.dtype, output_hsi.shape, output_hsi.max(), output_hsi.mean(), output_hsi.min())
-
-        # continue
-
-    
-
-
-
-
-
-        mos_all = input_mos
-        hsi_R_all = output_hsi
         data_name = mos_name
 
-
-
-        # f = h5py.File(opt.save_folder + 'HSI_R_' + data_name[:-4] + '_pol_all.h5', 'w')
-        # f['mos'] = input_mos
-        # f['hsi_R'] = output_hsi
-        # f.close()    
-
-
-
-        # break
-        for i in range(4):
-            hsi_r = hsi_R_all[i, :, :, :]
-            mos = mos_all[i, :, :]
-            print('hsi_r:', hsi_r.dtype, hsi_r.shape, hsi_r.max(), hsi_r.mean(), hsi_r.min())
-            print('mos:', mos.dtype, mos.shape, mos.max(), mos.mean(), mos.min())
-            rgb_R = np.zeros((hsi_r.shape[1], hsi_r.shape[2], 3), np.float32)
-            rgb_R[:, :, 0] = np.mean(hsi_r[24:27, :, :], 0)
-            rgb_R[:, :, 1] = np.mean(hsi_r[14:17, :, :], 0)
-            rgb_R[:, :, 2] = np.mean(hsi_r[2:5, :, :], 0)
-            rgb_R = rgb_R / rgb_R.max()
-            print('rgb_R', rgb_R.dtype, rgb_R.shape, rgb_R.max(), rgb_R.mean(), rgb_R.min())
-            im = plt.imshow(rgb_R)
-            plt.axis('off')
-            fig = plt.gcf()
-            fig.set_size_inches(hsi_r.shape[2] / 300, hsi_r.shape[1] / 300)  # dpi = 300, output = 700*700 pixels
-            plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-            plt.gca().yaxis.set_major_locator(plt.NullLocator())
-            plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-            plt.margins(0, 0)
-            fig.savefig(save_image_path+ data_name[:-4] + pols_names[i] + 'hsi_RGB_norm.png', transparent=True, dpi=300, pad_inches=0)
-            # plt.show()
-            plt.close()
-            plt.clf()
-            print('开始测试')
-
-            spectral.imshow(rgb_R, (0, 1, 2))
-            plt.axis('off')
-            fig = plt.gcf()
-            fig.set_size_inches(hsi_r.shape[2] / 300, hsi_r.shape[1] / 300)  # dpi = 300, output = 700*700 pixels
-            plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-            plt.gca().yaxis.set_major_locator(plt.NullLocator())
-            plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-            plt.margins(0, 0)
-            fig.savefig(save_image_path+ data_name[:-4] + pols_names[i] + 'hsi_RGB_norm_spectral.png', transparent=True, dpi=300, pad_inches=0)
-            # plt.show()
-            plt.close()
-            plt.clf()
-
-
-
-            plt.imshow(mos, cmap='gray', vmax=1.0, vmin=0)
-            plt.axis('off')
-            fig = plt.gcf()
-            fig.set_size_inches(hsi_r.shape[2] / 300, hsi_r.shape[1] / 300)  # dpi = 300, output = 700*700 pixels
-            plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-            plt.gca().yaxis.set_major_locator(plt.NullLocator())
-            plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-            plt.margins(0, 0)
-            fig.savefig(save_image_path+ data_name[:-4] + pols_names[i] + 'hsi_mos.png', transparent=True, dpi=300, pad_inches=0)
-            # plt.show()
-            plt.close()
-            plt.clf()
-            
-
-            for _ in range(100):
-                index_h = random.randint(0, hsi_r.shape[1] - 1)
-                index_w = random.randint(0, hsi_r.shape[2] - 1)
-
-                plt.plot(select_bands, hsi_r[:, index_h, index_w])
-
-            plt.xlim([400, 1000])
-            plt.xlabel('Wavelength (nm)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.savefig(save_image_path + data_name[:-4] + pols_names[i] + 'spectrum_100.png', transparent=True, dpi=300, pad_inches=0)
-            # plt.show()
-            plt.close()
-            plt.clf()
-            # exit()
-
-
-
-
-
-
-        plt.imshow(bmp.squeeze(), cmap='gray', vmax=1.0, vmin=0)
-        plt.axis('off')
-        fig = plt.gcf()
-        fig.set_size_inches(bmp.shape[2] / 300, bmp.shape[1] / 300)  # dpi = 300, output = 700*700 pixels
-        plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-        plt.gca().yaxis.set_major_locator(plt.NullLocator())
-        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        plt.margins(0, 0)
-        plt.savefig(save_image_path + data_name[:-4] + '_bmp.png', transparent=True, dpi=300,
-                    pad_inches=0)
-
-
-
-        mos_dop, mos_aop = Get_AOP_DOP(mos_all)
-
-
-        plt.imshow(mos_dop, cmap='jet', vmax=1.0, vmin=0)
-        plt.colorbar(label='Degree of Polarization (DOP)')
-        plt.title('DOP Heatmap')
-        plt.xlabel('X-axis')
-        plt.ylabel('Y-axis')
-        plt.savefig(save_image_path + data_name[:-4] + '_mos_dop_1.png', transparent=True, dpi=300,
-                    pad_inches=0)
-
-
-        # plt.show()
-        plt.clf()
-
-        #     cv2.imshow('Color Image', mos_dop)
-        #     cv2.waitKey(-1)
-
-        plt.imshow(mos_aop, cmap='hsv', vmax=np.pi, vmin=0)
-
-        plt.colorbar(label='Angle of Polarization (AOP) [degrees]')
-        plt.title('AOP Heatmap')
-        plt.xlabel('X-axis')
-        plt.ylabel('Y-axis')
-        plt.savefig(save_image_path + data_name[:-4] + '_mos_aop_1.png', transparent=True, dpi=300,
-                    pad_inches=0)
-        plt.clf()
-
-
-
-        plt.imshow(mos_dop, cmap='jet', vmax=1.0, vmin=0)
-        plt.axis('off')
-        fig = plt.gcf()
-        fig.set_size_inches(mos_dop.shape[1] / 300, mos_dop.shape[0] / 300)  # dpi = 300, output = 700*700 pixels
-        plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-        plt.gca().yaxis.set_major_locator(plt.NullLocator())
-        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        plt.margins(0, 0)
-        plt.savefig(save_image_path + data_name[:-4] + '_mos_dop.png', transparent=True, dpi=300,
-                    pad_inches=0)
-
-
-        # plt.show()
-        plt.clf()
-
-        #     cv2.imshow('Color Image', mos_dop)
-        #     cv2.waitKey(-1)
-
-        plt.imshow(mos_aop, cmap='hsv', vmax=np.pi, vmin=0)
-
-        plt.axis('off')
-        fig = plt.gcf()
-        fig.set_size_inches(mos_aop.shape[1] / 300, mos_aop.shape[0] / 300)  # dpi = 300, output = 700*700 pixels
-        plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-        plt.gca().yaxis.set_major_locator(plt.NullLocator())
-        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        plt.margins(0, 0)
-        plt.savefig(save_image_path + data_name[:-4] + '_mos_aop.png', transparent=True, dpi=300,
-                    pad_inches=0)
-        plt.clf()
-
-
-
-        pols_r = np.sum(hsi_R_all * css, 1)
-        print('pols_r:', pols_r.dtype, pols_r.shape, pols_r.max(), pols_r.mean(), pols_r.min())
-
-        dop_r, aop_r = Get_AOP_DOP(pols_r)
-        print('dop_r:', dop_r.dtype, dop_r.shape, dop_r.max(), dop_r.mean(), dop_r.min())
-
-        print('aop_r:', aop_r.dtype, aop_r.shape, aop_r.max(), aop_r.mean(), aop_r.min())
-
-        # plt.imshow(dop_r)
-        plt.imshow(dop_r, cmap='jet', vmax=1, vmin=0)
-        plt.axis('off')
-        fig = plt.gcf()
-        fig.set_size_inches(dop_r.shape[1] / 300, dop_r.shape[0] / 300)  # dpi = 300, output = 700*700 pixels
-        plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-        plt.gca().yaxis.set_major_locator(plt.NullLocator())
-        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        plt.margins(0, 0)
-        plt.savefig(save_image_path + data_name[:-4] + '_hsi_dop_r.png', transparent=True, dpi=300,
-                    pad_inches=0)
-        plt.close()
-        plt.clf()
-
-
-        plt.imshow(aop_r, cmap='hsv', vmax=np.pi, vmin=0)
-        plt.axis('off')
-        fig = plt.gcf()
-        fig.set_size_inches(aop_r.shape[1] / 300, aop_r.shape[0] / 300)  # dpi = 300, output = 700*700 pixels
-        plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-        plt.gca().yaxis.set_major_locator(plt.NullLocator())
-        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        plt.margins(0, 0)
-        plt.savefig(save_image_path + data_name[:-4] + '_hsi_aop_r.png', transparent=True, dpi=300,
-                    pad_inches=0)
-        plt.close()
-        plt.clf()
-
-        
-        for i in np.arange(0, 61, 1):
-            
-            pols = hsi_R_all[:, i, :, :]
-            print('pols:', select_bands[i], pols.dtype, pols.shape, pols.max(), pols.mean(), pols.min())
-            
-    #         dop, aop = Get_AOP_DOP(pols)
-
-            res_dop, res_aop = Get_AOP_DOP(pols)
-            plt.imshow(res_dop, cmap='jet', vmax=1, vmin=0)
-            plt.axis('off')
-            fig = plt.gcf()
-            fig.set_size_inches(res_dop.shape[1] / 300, res_dop.shape[0] / 300)  # dpi = 300, output = 700*700 pixels
-            plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-            plt.gca().yaxis.set_major_locator(plt.NullLocator())
-            plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-            plt.margins(0, 0)
-            plt.savefig(save_image_path + data_name[:-4] + '_' + str(select_bands[i]) +  '_dop.png', transparent=True, dpi=300,
-                        pad_inches=0)
-            plt.show()
-            plt.clf()
-            
-
-            plt.imshow(res_aop, cmap='hsv', vmax=np.pi, vmin=0)
- 
-            plt.axis('off')
-            fig = plt.gcf()
-            fig.set_size_inches(res_aop.shape[1] / 300, res_aop.shape[0] / 300)  # dpi = 300, output = 700*700 pixels
-            plt.gca().xaxis.set_major_locator(plt.NullLocator())  # 取出白边的操作
-            plt.gca().yaxis.set_major_locator(plt.NullLocator())
-            plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-            plt.margins(0, 0)
-
-
-            plt.savefig(save_image_path +data_name[:-4] + '_' + str(select_bands[i]) + '_aop.png', transparent=True, dpi=300,
-                        pad_inches=0)
-            plt.show()
-            plt.clf()
-
+        f = h5py.File(opt.save_folder + 'HSI_R_' + data_name[:-4] + '_pol_all.h5', 'w')
+        f['mos'] = input_mos
+        f['hsi_R'] = output_hsi
+        f.close()    
 
 
 if __name__ == '__main__':

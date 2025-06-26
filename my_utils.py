@@ -12,67 +12,16 @@ import torch.nn.functional as F
 import random
 import sys
 import cv2
-def save_matv73(mat_name, var_name, var):
-    hdf5storage.savemat(mat_name, {var_name: var}, format='7.3', store_python_metadata=True)
 
-
-#按照一定比例返回对应的监督学习和无监督学习
 def get_boolean_by_ratio(p):
     return random.choices(['Supervised', 'Unsupervised'], [p, 1 - p])[0]
 
 
-def create_generator(method, pretrained_model_path):
-    # Initialize the network
-    if method == 'specpols':
-        model_G = Spec_Pols(in_channels=1, out_channels=61, dim=32, deep_stage=3, num_blocks=[1, 1, 1, 1], num_heads=[1, 2, 4, 8])
-
-    if pretrained_model_path is not None:
-        print(f'load model from {pretrained_model_path}')
-        # checkpoint = torch.load(pretrained_model_path)
-
-        checkpoint = torch.load(pretrained_model_path)#为了避免这个警告并提高代码的安全性，你应该将 torch.load 调用中的 weights_only 设置为 True：
-
-        model_G.load_state_dict({k.replace('module.', ''): v for k, v in checkpoint['state_dict'].items()},
-                              strict=True)
-    return model_G
-
-
-
-# def mos_process(mos):
-#     mos_0 = mos[0, :, :]
-#     mos_45 = mos[1, :, :]
-#     mos_90 = mos[2, :, :] 
-#     mos_135 = mos[3, :, :]
-
-#     overexposure_threshold = 0.9
-
-#     # 计算各角度 MOS 的过曝掩码
-#     overexposed_0 = (mos_0 > overexposure_threshold).astype(np.float32)
-#     overexposed_45 = (mos_45 > overexposure_threshold).astype(np.float32)
-#     overexposed_90 = (mos_90 > overexposure_threshold).astype(np.float32)
-#     overexposed_135 = (mos_135 > overexposure_threshold).astype(np.float32)
-
-#     # 使用形态学操作去除孤立的过曝点，使用腐蚀操作
-#     kernel = np.ones((50, 50), np.uint8)
-#     cleaned_overexposed_0 = cv2.morphologyEx(overexposed_0, cv2.MORPH_CLOSE, kernel)
-#     cleaned_overexposed_45 = cv2.morphologyEx(overexposed_45, cv2.MORPH_CLOSE, kernel)
-#     cleaned_overexposed_90 = cv2.morphologyEx(overexposed_90, cv2.MORPH_CLOSE, kernel)
-#     cleaned_overexposed_135 = cv2.morphologyEx(overexposed_135, cv2.MORPH_CLOSE, kernel)
-
-#     save_mos_0 = mos_0 * (1 - cleaned_overexposed_0)
-#     save_mos_45 = mos_45 * (1 - cleaned_overexposed_45)
-#     save_mos_90 = mos_90 * (1 - cleaned_overexposed_90)
-#     save_mos_135 = mos_135 * (1 - cleaned_overexposed_135)
-#     new_mos = np.stack([save_mos_0, save_mos_45, save_mos_90, save_mos_135], 0)
-
-
-
-#     return new_mos
 
 class Loss_AOP_DOP(nn.Module):
     def __init__(self):
         super(Loss_AOP_DOP, self).__init__()
-        self.eps = 1e-6  # 更严格的数值稳定性阈值
+        self.eps = 1e-6 
 
     def forward(self, outputs, labels):
         assert outputs.shape == labels.shape
@@ -81,24 +30,20 @@ class Loss_AOP_DOP(nn.Module):
         labels = labels / labels_max
         outputs = outputs / labels_max
 
-        # 更安全的数值处理
         outputs = torch.nan_to_num(outputs, nan=self.eps, posinf=1-self.eps, neginf=self.eps)
         labels = torch.nan_to_num(labels, nan=self.eps, posinf=1-self.eps, neginf=self.eps)
         outputs = torch.clamp(outputs, min=self.eps, max=1-self.eps)
         labels = torch.clamp(labels, min=self.eps, max=1-self.eps)
 
-        # 计算偏振参数
         outputs_dop, outputs_aop, outputs_S1, outputs_S2 = self.get_aop_dop(outputs)
         labels_dop, labels_aop, labels_S1, labels_S2 = self.get_aop_dop(labels)
 
-        # 计算误差 - 加入平滑L1损失减少异常值影响
+        # Incorporating smooth L1 loss to reduce the impact of outliers
         error_S1 = F.smooth_l1_loss(outputs_S1, labels_S1, beta=0.2)
         error_S2 = F.smooth_l1_loss(outputs_S2, labels_S2, beta=0.2)
         
-        # DOP损失加入物理约束
         error_dop = F.smooth_l1_loss(outputs_dop, labels_dop, beta=0.2)
         
-        # AOP处理相位周期性
         aop_diff = torch.remainder(outputs_aop - labels_aop + 0.5*np.pi, np.pi) - 0.5*np.pi
         error_aop = torch.mean(torch.abs(aop_diff))
 
@@ -114,154 +59,14 @@ class Loss_AOP_DOP(nn.Module):
         S1 = pol_0 - pol_90 
         S2 = pol_45 - pol_135 
 
-        # 更稳定的AOP计算
         S1_safe = torch.where(torch.abs(S1) < self.eps, torch.sign(S1)*self.eps, S1)
         S2_safe = torch.where(torch.abs(S2) < self.eps, torch.sign(S2)*self.eps, S2)
         aop = 0.5 * torch.atan2(S2_safe, S1_safe)
 
-        # 物理正确的DOP计算
         dop = torch.sqrt(S1**2 + S2**2 + self.eps) / (S0 + self.eps)
-        dop = torch.clamp(dop, 0, 1)  # 确保在物理范围内
+        dop = torch.clamp(dop, 0, 1)  
 
         return dop, aop, S1, S2
-
-
-# class Loss_AOP_DOP(nn.Module):
-#     def __init__(self):
-#         super(Loss_AOP_DOP, self).__init__()
-
-#     def forward(self, outputs, labels):
-#         assert outputs.shape == labels.shape
-
-#         # 检查 NaN 并替换
-#         outputs = torch.nan_to_num(outputs, nan=1e-5)
-#         labels = torch.nan_to_num(labels, nan=1e-5)
-#         outputs = torch.maximum(outputs, torch.tensor(1e-5))
-#         labels = torch.maximum(labels, torch.tensor(1e-5))
-
-
-#         outputs_dop, outputs_aop, outputs_S1, outputs_S2 = Get_AOP_DOP(outputs)
-#         labels_dop, labels_aop, labels_S1, labels_S2 = Get_AOP_DOP(labels)
-
-
-#         # print('labels_dop:', labels_dop.dtype, labels_dop.shape, labels_dop.max(), labels_dop.mean(), labels_dop.min())
-
-#         # print('outputs_dop>>>>>>>>>:', outputs_dop.dtype, outputs_dop.shape, outputs_dop.max(), outputs_dop.mean(), outputs_dop.min())
-#         # print('outputs_aop:', outputs_aop.dtype, outputs_aop.shape, outputs_aop.max(), outputs_aop.mean(), outputs_aop.min())
-#         # print('labels_dop:', labels_dop.dtype, labels_dop.shape, labels_dop.max(), labels_dop.mean(), labels_dop.min())
-#         # print('labels_aop:', labels_aop.dtype, labels_aop.shape, labels_aop.max(), labels_aop.mean(), labels_aop.min())
-
-#         error_S1 = torch.abs(outputs_S1 - labels_S1)
-#         error_S2 = torch.abs(outputs_S2 - labels_S2)
-
-#         error_dop = torch.abs(labels_dop - outputs_dop)
-
-#         error_aop = torch.abs(labels_aop - outputs_aop)
-
-#         dop_mae = torch.mean(error_dop)
-#         aop_mae = torch.mean(error_aop)
-
-#         S1_mae = torch.mean(error_S1)
-#         S2_mae = torch.mean(error_S2)
-
-#         if torch.isnan(dop_mae).any():
-#             print("dop_mae Error: NaN found in tensor!")
-#             print('outputs_dop>>>>>>>>>:', outputs_dop.dtype, outputs_dop.shape, outputs_dop.max(), outputs_dop.mean(), outputs_dop.min())
-#             print('outputs_aop:', outputs_aop.dtype, outputs_aop.shape, outputs_aop.max(), outputs_aop.mean(), outputs_aop.min())
-#             print('labels_dop:', labels_dop.dtype, labels_dop.shape, labels_dop.max(), labels_dop.mean(), labels_dop.min())
-#             print('labels_aop:', labels_aop.dtype, labels_aop.shape, labels_aop.max(), labels_aop.mean(), labels_aop.min())
-
-#             sys.exit(1)  # 退出程序，返回错误码 1
-
-#         if torch.isnan(aop_mae).any():
-#             print("aop_mae Error: NaN found in tensor!")
-#             print('outputs_dop>>>>>>>>>:', outputs_dop.dtype, outputs_dop.shape, outputs_dop.max(), outputs_dop.mean(), outputs_dop.min())
-#             print('outputs_aop:', outputs_aop.dtype, outputs_aop.shape, outputs_aop.max(), outputs_aop.mean(), outputs_aop.min())
-#             print('labels_dop:', labels_dop.dtype, labels_dop.shape, labels_dop.max(), labels_dop.mean(), labels_dop.min())
-#             print('labels_aop:', labels_aop.dtype, labels_aop.shape, labels_aop.max(), labels_aop.mean(), labels_aop.min())
-
-#             sys.exit(1)  # 退出程序，返回错误码 1
-
-#         return dop_mae, aop_mae, S1_mae, S2_mae
-
-
-
-
-# class Loss_AOP_DOP(nn.Module):
-#     def __init__(self):
-#         super(Loss_AOP_DOP, self).__init__()
-
-#     def forward(self, outputs, labels):
-#         assert outputs.shape == labels.shape
-
-#         # 检查 NaN 并替换
-#         outputs = torch.nan_to_num(outputs, nan=1e-5)
-#         labels = torch.nan_to_num(labels, nan=1e-5)
-#         outputs = torch.maximum(outputs, torch.tensor(1e-5))
-#         labels = torch.maximum(labels, torch.tensor(1e-5))
-
-
-        
-
-
-        
-
-#         # outputs = outputs.permute(1, 0, 2, 3)
-#         # labels = labels.permute(1, 0, 2, 3)
-#         # print('outputs:', outputs.dtype, outputs.shape, outputs.max(), outputs.mean(), outputs.min())
-#         # print('labels:', labels.dtype, labels.shape, labels.max(), labels.mean(), labels.min())
-
-
-#         outputs_dop, outputs_aop, outputs_S1, outputs_S2 = Get_AOP_DOP(outputs)
-#         labels_dop, labels_aop, labels_S1, labels_S2 = Get_AOP_DOP(labels)
-
-#         # labels_dop = torch.minimum(labels_dop, torch.tensor(1.0))
-#         # outputs_dop = torch.minimum(outputs_dop, torch.tensor(1.0))
-
-#         # print('labels_dop:', labels_dop.dtype, labels_dop.shape, labels_dop.max(), labels_dop.mean(), labels_dop.min())
-
-#         # print('outputs_dop>>>>>>>>>:', outputs_dop.dtype, outputs_dop.shape, outputs_dop.max(), outputs_dop.mean(), outputs_dop.min())
-#         # print('outputs_aop:', outputs_aop.dtype, outputs_aop.shape, outputs_aop.max(), outputs_aop.mean(), outputs_aop.min())
-#         # print('labels_dop:', labels_dop.dtype, labels_dop.shape, labels_dop.max(), labels_dop.mean(), labels_dop.min())
-#         # print('labels_aop:', labels_aop.dtype, labels_aop.shape, labels_aop.max(), labels_aop.mean(), labels_aop.min())
-
-#         error_S1 = torch.abs(outputs_S1 - labels_S1)
-#         error_S2 = torch.abs(outputs_S2 - labels_S2)
-
-#         error_dop = torch.abs(labels_dop - outputs_dop)
-#         # print('error_dop:', error_dop.dtype, error_dop.shape, error_dop.max(), error_dop.mean(), error_dop.min())
-
-
-#         error_aop = torch.abs(labels_aop - outputs_aop)
-#         # print('error_aop:', error_aop.dtype, error_aop.shape, error_aop.max(), error_aop.mean(), error_aop.min())
-
-#         dop_mae = torch.mean(error_dop)
-#         aop_mae = torch.mean(error_aop)
-
-#         S1_mae = torch.mean(error_S1)
-#         S2_mae = torch.mean(error_S2)
-
-#         if torch.isnan(dop_mae).any():
-#             print("dop_mae Error: NaN found in tensor!")
-#             print('outputs_dop>>>>>>>>>:', outputs_dop.dtype, outputs_dop.shape, outputs_dop.max(), outputs_dop.mean(), outputs_dop.min())
-#             print('outputs_aop:', outputs_aop.dtype, outputs_aop.shape, outputs_aop.max(), outputs_aop.mean(), outputs_aop.min())
-#             print('labels_dop:', labels_dop.dtype, labels_dop.shape, labels_dop.max(), labels_dop.mean(), labels_dop.min())
-#             print('labels_aop:', labels_aop.dtype, labels_aop.shape, labels_aop.max(), labels_aop.mean(), labels_aop.min())
-
-#             sys.exit(1)  # 退出程序，返回错误码 1
-
-#         if torch.isnan(aop_mae).any():
-#             print("aop_mae Error: NaN found in tensor!")
-#             print('outputs_dop>>>>>>>>>:', outputs_dop.dtype, outputs_dop.shape, outputs_dop.max(), outputs_dop.mean(), outputs_dop.min())
-#             print('outputs_aop:', outputs_aop.dtype, outputs_aop.shape, outputs_aop.max(), outputs_aop.mean(), outputs_aop.min())
-#             print('labels_dop:', labels_dop.dtype, labels_dop.shape, labels_dop.max(), labels_dop.mean(), labels_dop.min())
-#             print('labels_aop:', labels_aop.dtype, labels_aop.shape, labels_aop.max(), labels_aop.mean(), labels_aop.min())
-
-#             sys.exit(1)  # 退出程序，返回错误码 1
-
-#         return dop_mae, aop_mae, S1_mae, S2_mae
-
-
 
 
 class AverageMeter(object):
@@ -337,38 +142,7 @@ class Loss_SAM(nn.Module):
         return sam
 
 
-
-
-
-# def Get_AOP_DOP(pols):
-#     pol_0 = pols[:, 0, :, :]
-#     pol_45 = pols[:, 1, :, :]
-#     pol_90 = pols[:, 2, :, :]
-#     pol_135 = pols[:, 3, :, :]
-
-#     S0 = pol_0 + pol_90 
-#     S1 = pol_0 - pol_90 
-#     S2 = pol_45 - pol_135 
-#     S3 = 0
-
-#     aop = 0.5 * torch.arctan2(S2, S1)
-
-#     dop = torch.sqrt(S1 ** 2 + S2 ** 2) / torch.maximum(S0, torch.tensor(1e-6))
-#     dop = torch.maximum(dop, torch.tensor(1))
-
-#     return dop, aop, S1, S2
-
-
-
-
-
 def raw2pols(raw):
-
-    #将单通道的马赛克偏振图，转换为4通道的偏振图
-
-    # raw = raw.unsqueeze(0)
-
-
     _, _, h, w = raw.shape
     pols = torch.cat((raw[:, :, 0:h:2, 0:w:2],  # 0
     raw[:, :, 0:h:2, 1:w:2],  # 45
@@ -376,48 +150,6 @@ def raw2pols(raw):
     raw[:, :, 1:h:2, 0:w:2]), axis=1)
     
     return pols
-
-# class Loss_AOP_DOP_MSE(nn.Module):
-#     def __init__(self):
-#         super(Loss_AOP_DOP_MSE, self).__init__()
-
-#     def forward(self, outputs, labels):
-#         assert outputs.shape == labels.shape
-
-#         outputs = torch.clip(outputs, min=0, max=1)
-
-
-#         outputs = raw2pols(outputs)
-#         labels = raw2pols(labels)
-
-
-
-#         # print('outputs:', outputs.dtype, outputs.shape, outputs.max(), outputs.mean(), outputs.min())
-
-#         outputs_dop, outputs_aop = Get_AOP_DOP(outputs)
-#         labels_dop, labels_aop = Get_AOP_DOP(labels)
-
-#         # print('outputs_dop:', outputs_dop.dtype, outputs_dop.shape, outputs_dop.max(), outputs_dop.mean(), outputs_dop.min())
-#         # print('outputs_aop:', outputs_aop.dtype, outputs_aop.shape, outputs_aop.max(), outputs_aop.mean(), outputs_aop.min())
-#         # print('labels_dop:', labels_dop.dtype, labels_dop.shape, labels_dop.max(), labels_dop.mean(), labels_dop.min())
-#         # print('labels_aop:', labels_aop.dtype, labels_aop.shape, labels_aop.max(), labels_aop.mean(), labels_aop.min())
-
-#         error_dop = torch.abs(labels_dop - outputs_dop)
-#         # print('error_dop:', error_dop.dtype, error_dop.shape, error_dop.max(), error_dop.mean(), error_dop.min())
-
-
-#         error_aop = torch.abs(labels_aop - outputs_aop)
-#         # print('error_aop:', error_aop.dtype, error_aop.shape, error_aop.max(), error_aop.mean(), error_aop.min())
-
-#         dop_mse = torch.mean(error_dop)
-#         aop_mse = torch.mean(error_aop)
-
-#         return dop_mse, aop_mse
-
-
-
-
-
 
 
 

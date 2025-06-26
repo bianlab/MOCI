@@ -69,17 +69,13 @@ class CrossPolarAttention(nn.Module):
         self.heads = heads
         self.rescale = nn.Parameter(torch.ones(heads, 1, 1))
 
-        # 注意力仅在 P 维做，保持空间结构
         self.to_q = nn.Linear(dim, dim, bias=False)
         self.to_k = nn.Linear(dim, dim, bias=False)
         self.to_v = nn.Linear(dim, dim, bias=False)
-
         self.proj = nn.Linear(dim, dim)
 
-
-        # 引导感知 mask 空间信息提取模块
         self.mask_proj = nn.Sequential(
-            nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=dim),  # DW卷积保留空间位置
+            nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=dim),  
             nn.GELU(),
             nn.Conv2d(dim, dim, kernel_size=1)
         )
