@@ -1,0 +1,1 @@
+The training datase can be download from: https://github.com/bianlab/Hyperspectral-imaging-dataset
