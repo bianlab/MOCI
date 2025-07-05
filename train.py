@@ -24,14 +24,13 @@ parser.add_argument('--batch_size', type=int, default=16, help='batch size')
 parser.add_argument("--end_epoch", type=int, default=200, help="number of epochs")
 parser.add_argument("--epoch_sam_num", type=int, default=10000, help="per_epoch_iteration")
 parser.add_argument("--init_lr", type=float, default=4e-4, help="initial learning rate")
-parser.add_argument("--gpu_id", type=str, default='2', help='select gpu')
+parser.add_argument("--gpu_id", type=str, default='0', help='select gpu')
 
-
-# parser.add_argument("--pretrained_model_path", type=str, default=None, help='pre-trained model path')
+parser.add_argument("--pretrained_model_path", type=str, default=None, help='pre-trained model path')
 
 parser.add_argument("--sigma", type=float, default=(0, 0.2/255, 0.5/255, 1 / 255, 2/255, 3/255), help="Sigma of Gaussian Noise")
 
-parser.add_argument("--mask_path", type=str, default='./MASK/Mask_MOCI.mat', help='path of calibrated sensing matrix')
+parser.add_argument("--mask_path", type=str, default='./MASK/mask.mat', help='path of calibrated sensing matrix')
 
 parser.add_argument("--output_folder", type=str, default='./exp/Polarization_Spec_PSRNet_Fusion_MASK/mask_0108_pols_all_pols_0421_train256_alternate_freq2/', help='output path')
 parser.add_argument("--start_dir", type=int, default=(0, 0), help="size of test image coordinate")

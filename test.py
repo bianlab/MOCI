@@ -20,16 +20,16 @@ parser = argparse.ArgumentParser(description="Reconstruct hypersepctral images f
 parser.add_argument("--method", type=str, default='psrnet', help='Model')
 parser.add_argument("--gpu_id", type=str, default='2', help='path log files')
 parser.add_argument('--batch_size', type=int, default=1, help='batch size')
-parser.add_argument("--mask_path", type=str, default='./MASK/mask_0108_pols_all.mat', help='path log files')
+parser.add_argument("--mask_path", type=str, default='./MASK/mask.mat', help='path log files')
 parser.add_argument("--start_dir", type=int, default=(0, 0), help="size of test image coordinate")
 parser.add_argument("--image_size", type=int, default=(1024, 1224), help="size of test image")
 
 
-parser.add_argument("--pretrained_model_path", type=str, default='./Model_zoo/psrnet_MOCI.pth', help='path log files')
+parser.add_argument("--pretrained_model_path", type=str, default='./Model_zoo/psrnet.pth', help='path log files')
 
 
-parser.add_argument("--image_folder", type=str, default= './Test/Measurement/test_1/', help='path log files')
-parser.add_argument("--save_folder", type=str, default= './Test/Measurement/test_1_HSIPOLS_0531/', help='path log files')
+parser.add_argument("--image_folder", type=str, default= './Measurement/images/', help='path log files')
+parser.add_argument("--save_folder", type=str, default= './Measurement/Output_PHI/', help='path log files')
 
 
 opt = parser.parse_args()
@@ -187,9 +187,6 @@ def main():
     css = hdf5storage.loadmat('/ssd/wzh/home_ssd/1_SpecPol/1_SpecPolCode/MASK/CA050.mat')['css']
     css = np.expand_dims(np.expand_dims(np.expand_dims(css, 0), 2), 3)
     print('css:', css.dtype, css.shape, css.max(), css.mean(), css.min())
-
-
-
 
 
 
