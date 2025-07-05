@@ -30,11 +30,11 @@ The project has been tested on CUDA 12.4, pytorch 2.4.1, torchvision 0.19.1,  py
 
 ### 3.1 Main program and data description
 
-- The model of hyperspectral images reconstruction:  `./architecture/PSRNet.py` 
+- The model of reconstruction:  `./architecture/PSRNet.py` 
 
-- Pre-trained weights of PSRNet for PHI sensor:   `./model_zoo/PSRNet_MOCI.pth` 
+- Pre-trained weights of PSRNet for PHI sensor:   `./model_zoo/psrnet.pth` 
 
-- Calibrated sensing matrix of PHI snesor:   `./MASK/mask.mat` 
+- Calibrated sensing matrix of PHI sensor:   `./MASK/mask.mat` 
 
 - Measurements collected by our single-shot PHI senor:   `./Measurements/` 
 
@@ -46,7 +46,7 @@ The project has been tested on CUDA 12.4, pytorch 2.4.1, torchvision 0.19.1,  py
 
 Run the train program on the collected measurements to reconstruct polarizaiton-hyperspectral images in pytorch platform.
 
-Download the training dataset of PHI senor into ` ./Dataset_Train/HSI_400_1000/HSI_all/`. 
+Download the training dataset of PHI senor into ` ./Dataset_Train/`. 
 
 The training programs are executed to train the polarization and spectral reconstruction model. 
 
@@ -62,13 +62,13 @@ python train.py
 
 Run the test program on the collected images to reconstruct polarization and hyperspectral images in pytorch platform.
 
-When the images were collected using our PHI sensors,  the polarization and hypersepectral images can be reconstructed by run the following program in the terminal.
+When the images were collected using our PHI sensors,  the data can be reconstructed by run the following program in the terminal.
 
 ```python
 python test.py
 ```
 
-The measurements collected using PHI sensor from the folder  `'./Measurements/' `  . And output reconstructed multi-dimensional images  will be saved in  `'./Measurements/Output_PHI/' `  .
+The measurements collected using PHI sensor from the folder  `'./Measurements/images/' `  . And output reconstructed multi-dimensional images  will be saved in  `'./Measurements/Output_PHI/' `  .
 
 
 
